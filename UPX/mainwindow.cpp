@@ -25,7 +25,7 @@ MainWindow::~MainWindow()
 
 void MainWindow::readPendingDatagrams()
 {
-    qDebug() << "recive";
+    qDebug() << "< recive";
     int i = 0;
     while (socket->hasPendingDatagrams()) {
         QNetworkDatagram datagram = socket->receiveDatagram();
@@ -49,9 +49,17 @@ void MainWindow::on_set_pushButton_clicked()
 
 void MainWindow::on_read_pushButton_clicked()
 {
+    qDebug() << "> send begin";
     QByteArray buf;
     makeUPXHeader(MEM_READ_TYPE, 0, 6, 0, buf);
     sendMsg(buf);
+
+    delay(1000);
+
+    buf.clear();
+    makeUPXHeader(MEM_READ_TYPE, 0, 20, 0, buf);
+    sendMsg(buf);
+    qDebug() << "> send end";
 }
 
 QString MainWindow::checkIP(const QString &str)
@@ -120,6 +128,14 @@ void MainWindow::makeUPXHeader(const quint8 cmd, const quint32 startAddr, const 
     msg.prepend(qint8(tmp32 >>  8));
     msg.prepend(qint8(tmp32 >> 16));
     msg.prepend(qint8(tmp32 >> 24));
+}
+
+void MainWindow::delay(const int time_ms)
+{
+    QTime t1 = QTime::currentTime();
+    while (t1.msecsTo(QTime::currentTime()) > time_ms){
+        qApp->processEvents(QEventLoop::ExcludeUserInputEvents);
+    }
 }
 
 void MainWindow::on_ip_lineEdit_editingFinished()

@@ -5,6 +5,7 @@
 #include <QUdpSocket>
 #include <QNetworkDatagram>
 #include <QDebug>
+#include <QTime>
 
 namespace Ui {
 class MainWindow;
@@ -47,6 +48,7 @@ private:
 
     void sendMsg(const QByteArray &msg);
     void makeUPXHeader(const quint8 cmd, const quint32 startAddr, const quint32 size, const quint32 id, QByteArray &msg);
+    void delay(const int time_ms);
 
 };
 
