@@ -25,13 +25,22 @@ MainWindow::~MainWindow()
 
 void MainWindow::readPendingDatagrams()
 {
-    qDebug() << "< recive";
+    QByteArray buf;
+    while (socket->hasPendingDatagrams()) {
+        QNetworkDatagram datagram = socket->receiveDatagram();
+        if (datagram.data().length() > 4)
+            buf = datagram.data().mid(4, datagram.data().length());
+        //RAWdataOut(buf);
+        processData(buf);
+    }
+
+    /*qDebug() << "< recive";
     int i = 0;
     while (socket->hasPendingDatagrams()) {
         QNetworkDatagram datagram = socket->receiveDatagram();
         qDebug() << "pack: " << i++;
         RAWdataOut(datagram.data());
-    }
+    }*/
 }
 
 
@@ -49,7 +58,14 @@ void MainWindow::on_set_pushButton_clicked()
 
 void MainWindow::on_read_pushButton_clicked()
 {
-    qDebug() << "> send begin";
+    quint32 baseAddr = quint32(ui->baseDec_spinBox->value());
+    quint32 length = quint32(ui->length_spinBox->value());
+
+    QByteArray buf;
+    makeUPXHeader(MEM_READ_TYPE, baseAddr, length, 0, buf);
+    sendMsg(buf);
+
+    /*qDebug() << "> send begin";
     QByteArray buf;
     makeUPXHeader(MEM_READ_TYPE, 0, 6, 0, buf);
     sendMsg(buf);
@@ -59,7 +75,7 @@ void MainWindow::on_read_pushButton_clicked()
     buf.clear();
     makeUPXHeader(MEM_READ_TYPE, 0, 20, 0, buf);
     sendMsg(buf);
-    qDebug() << "> send end";
+    qDebug() << "> send end";*/
 }
 
 QString MainWindow::checkIP(const QString &str)
@@ -138,7 +154,50 @@ void MainWindow::delay(const int time_ms)
     }
 }
 
+void MainWindow::processData(const QByteArray &msg)
+{
+    QString str;
+    QString delimiter = ui->delimiter_lineEdit->text();
+    ui->data_plainTextEdit->clear();
+
+    // Header
+    if (ui->decAddres_checkBox->isChecked())
+        str.push_back("Dec Address");             // 13
+    if (ui->hexAddres_checkBox->isChecked())
+        str.push_back(" | Hex Address");            // 13
+    if (ui->decData_checkBox->isChecked())
+        str.push_back(" | Dec Data");               // 10
+    if (ui->hexData_checkBox->isChecked())
+        str.push_back(" | Hex Data");              // 10
+    ui->data_plainTextEdit->appendPlainText(str);
+
+    // Body
+    for (int i = 0; i < msg.length(); ++i){
+        str.clear();
+        if (ui->decAddres_checkBox->isChecked())
+            str.push_back(QString("%0").arg(i + ui->baseDec_spinBox->value(), 0));
+        if (ui->hexAddres_checkBox->isChecked())
+            str.push_back(delimiter + QString("0x%0").arg(i + ui->baseDec_spinBox->value(), 0, 16, QChar('0')));
+        if (ui->decData_checkBox->isChecked())
+            str.push_back(delimiter + QString("%0").arg(quint8(msg.at(i)), 0));
+        if (ui->hexData_checkBox->isChecked())
+            str.push_back(delimiter + QString("0x%0").arg(quint8(msg.at(i)), 2, 16, QChar('0')));
+        ui->data_plainTextEdit->appendPlainText(str);
+    }
+
+}
+
 void MainWindow::on_ip_lineEdit_editingFinished()
 {
     ui->ip_lineEdit->setText(checkIP(ui->ip_lineEdit->text()));
+}
+
+void MainWindow::on_baseDec_spinBox_valueChanged(int arg1)
+{
+    ui->baseHex_spinBox->setValue(arg1);
+}
+
+void MainWindow::on_baseHex_spinBox_valueChanged(int arg1)
+{
+    ui->baseDec_spinBox->setValue(arg1);
 }

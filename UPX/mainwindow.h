@@ -29,6 +29,10 @@ private slots:
 
     void on_ip_lineEdit_editingFinished();
 
+    void on_baseDec_spinBox_valueChanged(int arg1);
+
+    void on_baseHex_spinBox_valueChanged(int arg1);
+
 private:
     Ui::MainWindow *ui;
     QUdpSocket *socket;
@@ -49,6 +53,9 @@ private:
     void sendMsg(const QByteArray &msg);
     void makeUPXHeader(const quint8 cmd, const quint32 startAddr, const quint32 size, const quint32 id, QByteArray &msg);
     void delay(const int time_ms);
+
+    // Обработка данных
+    void processData(const QByteArray &msg);
 
 };
 
