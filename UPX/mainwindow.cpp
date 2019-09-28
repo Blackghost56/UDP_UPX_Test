@@ -10,6 +10,9 @@ MainWindow::MainWindow(QWidget *parent) :
     ip.setAddress(ui->ip_lineEdit->text());
     dst_port = quint16(ui->dst_port_spinBox->value());
     src_port = quint16(ui->src_port_spinBox->value());
+    baseAddr = quint32(ui->baseDec_spinBox->value());
+    length = quint32(ui->length_spinBox->value());
+    tableInit();
 
     socket = new QUdpSocket(this);
     connect(socket, &QUdpSocket::readyRead, this, &MainWindow::readPendingDatagrams);
@@ -33,14 +36,6 @@ void MainWindow::readPendingDatagrams()
         //RAWdataOut(buf);
         processData(buf);
     }
-
-    /*qDebug() << "< recive";
-    int i = 0;
-    while (socket->hasPendingDatagrams()) {
-        QNetworkDatagram datagram = socket->receiveDatagram();
-        qDebug() << "pack: " << i++;
-        RAWdataOut(datagram.data());
-    }*/
 }
 
 
@@ -58,24 +53,9 @@ void MainWindow::on_set_pushButton_clicked()
 
 void MainWindow::on_read_pushButton_clicked()
 {
-    quint32 baseAddr = quint32(ui->baseDec_spinBox->value());
-    quint32 length = quint32(ui->length_spinBox->value());
-
     QByteArray buf;
     makeUPXHeader(MEM_READ_TYPE, baseAddr, length, 0, buf);
     sendMsg(buf);
-
-    /*qDebug() << "> send begin";
-    QByteArray buf;
-    makeUPXHeader(MEM_READ_TYPE, 0, 6, 0, buf);
-    sendMsg(buf);
-
-    delay(1000);
-
-    buf.clear();
-    makeUPXHeader(MEM_READ_TYPE, 0, 20, 0, buf);
-    sendMsg(buf);
-    qDebug() << "> send end";*/
 }
 
 QString MainWindow::checkIP(const QString &str)
@@ -100,6 +80,38 @@ QString MainWindow::checkIP(const QString &str)
     out_str = QString("%1.%2.%3.%4").arg(vec.at(0)).arg(vec.at(1)).arg(vec.at(2)).arg(vec.at(3));
 
     return out_str;
+}
+
+int MainWindow::StrIntValueCheck(QString &&str, const int base, const int min, const int max, const int def, int &state, QString label)
+{
+    state = OK;
+    int buf = 0;
+    bool flag = false;
+
+    buf = str.toInt(&flag, base);
+
+    if (!flag)
+    {
+        state = MISTAKE;
+        qDebug() << "Input value '" << label << "' incorrected";
+        buf = def;
+        str = QString::number(def);
+    }
+    if (buf < min)
+    {
+        state = LESS;
+        qDebug() << "Input value '" << label << "' less than the lower limit";
+        buf = min;
+        str = QString::number(min);
+    }
+    if (buf > max)
+    {
+        state = GREATER;
+        qDebug() << "Input value '" << label << "' is greater than the upper limit";
+        buf = max;
+        str = QString::number(max);
+    }
+    return buf;
 }
 
 void MainWindow::RAWdataOut(const QByteArray &data, const int str_length)
@@ -156,35 +168,115 @@ void MainWindow::delay(const int time_ms)
 
 void MainWindow::processData(const QByteArray &msg)
 {
-    QString str;
-    QString delimiter = ui->delimiter_lineEdit->text();
-    ui->data_plainTextEdit->clear();
+    currentData = msg;
+    tableUpdate();
+}
 
-    // Header
+void MainWindow::tableInit()
+{
+    tableResize();
+}
+
+void MainWindow::tableClear()
+{
+    ui->tableWidget->clear();
+}
+
+void MainWindow::tableResize()
+{
+    tableClear();
+    QStringList HorizontalHeaderLabels;
+
     if (ui->decAddres_checkBox->isChecked())
-        str.push_back("Dec Address");             // 13
+        HorizontalHeaderLabels << STR_DEC_ADRR;
     if (ui->hexAddres_checkBox->isChecked())
-        str.push_back(" | Hex Address");            // 13
-    if (ui->decData_checkBox->isChecked())
-        str.push_back(" | Dec Data");               // 10
-    if (ui->hexData_checkBox->isChecked())
-        str.push_back(" | Hex Data");              // 10
-    ui->data_plainTextEdit->appendPlainText(str);
+        HorizontalHeaderLabels << STR_HEX_ADRR;
+    HorizontalHeaderLabels << STR_READ_DATA << STR_WRITE_DATA;
 
-    // Body
-    for (int i = 0; i < msg.length(); ++i){
-        str.clear();
-        if (ui->decAddres_checkBox->isChecked())
-            str.push_back(QString("%0").arg(i + ui->baseDec_spinBox->value(), 0));
-        if (ui->hexAddres_checkBox->isChecked())
-            str.push_back(delimiter + QString("0x%0").arg(i + ui->baseDec_spinBox->value(), 0, 16, QChar('0')));
-        if (ui->decData_checkBox->isChecked())
-            str.push_back(delimiter + QString("%0").arg(quint8(msg.at(i)), 0));
-        if (ui->hexData_checkBox->isChecked())
-            str.push_back(delimiter + QString("0x%0").arg(quint8(msg.at(i)), 2, 16, QChar('0')));
-        ui->data_plainTextEdit->appendPlainText(str);
+    const int NumRow = int(length);
+    const int NumColumn = HorizontalHeaderLabels.length();
+
+    ui->tableWidget->setColumnCount(NumColumn);
+    ui->tableWidget->setRowCount(NumRow);
+    //ui->tableWidget->verticalHeader()->setDefaultSectionSize(10);
+    ui->tableWidget->verticalHeader()->setVisible(false);
+    //verticalHeader()->setStretchLastSection(true);
+    //ui->tableWidget->setVerticalHeaderLabels(VerticalHeaderLabels);
+    ui->tableWidget->horizontalHeader()->setVisible(true);
+    ui->tableWidget->horizontalHeader()->setStretchLastSection(true);
+    ui->tableWidget->setHorizontalHeaderLabels(HorizontalHeaderLabels);
+
+    int posColumn = 0;
+    QTableWidgetItem *item;
+
+    // Dec Address
+    if (ui->decAddres_checkBox->isChecked()){
+        for (int i = 0; i < NumRow; i++)
+        {
+            item = new QTableWidgetItem();
+            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            item->setTextAlignment(Qt::AlignCenter);
+            item->setText(QString("%0").arg(baseAddr + quint32(i)));
+            ui->tableWidget->setItem(i, posColumn, item);
+        }
+        posColumn++;
     }
 
+    // Hex Address
+    if (ui->hexAddres_checkBox->isChecked()){
+        for (int i = 0; i < NumRow; i++)
+        {
+            item = new QTableWidgetItem();
+            item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+            item->setTextAlignment(Qt::AlignCenter);
+            item->setText(QString("%0").arg(baseAddr + quint32(i), 0, 16));
+            ui->tableWidget->setItem(i, posColumn, item);
+        }
+        posColumn++;
+    }
+
+    // Read data
+    for (int i = 0; i < NumRow; i++)
+    {
+        item = new QTableWidgetItem();
+        item->setFlags(item->flags() & ~Qt::ItemIsEditable);
+        item->setTextAlignment(Qt::AlignCenter);
+        //item->setText("");
+        ui->tableWidget->setItem(i, posColumn, item);
+    }
+    posColumn++;
+
+    // Write data
+    for (int i = 0; i < NumRow; i++)
+    {
+        item = new QTableWidgetItem();
+        item->setTextAlignment(Qt::AlignCenter);
+        item->setText("0");
+        ui->tableWidget->setItem(i, posColumn, item);
+    }
+}
+
+void MainWindow::tableUpdate()
+{
+    if (ui->tableWidget->rowCount() != currentData.length()){
+        qDebug() << "Error. Table update. rowCount(): " << ui->tableWidget->rowCount() << "\tdata.length()" << currentData.length();
+        return;
+    }
+    int readColumn = ui->tableWidget->columnCount() - 2;
+    for (int i = 0; i < ui->tableWidget->rowCount(); ++i) {
+        ui->tableWidget->item(i, readColumn)->setText(QString("%0").arg(quint8(currentData.at(i)), 2, 16));
+    }
+}
+
+void MainWindow::tableCopyColumn(const int from, const int to)
+{
+    if ((ui->tableWidget->columnCount() <= from) || (ui->tableWidget->columnCount() <= to)){
+        qDebug() << "Error. Copy table column. Size: " << ui->tableWidget->columnCount() << "\tfrom: " << from << "\tto: " << to;
+        return;
+    }
+    for (int i = 0; i < ui->tableWidget->rowCount(); ++i) {
+        ui->tableWidget->item(i, to)->setText(ui->tableWidget->item(i, from)->text());
+    }
 }
 
 void MainWindow::on_ip_lineEdit_editingFinished()
@@ -195,9 +287,113 @@ void MainWindow::on_ip_lineEdit_editingFinished()
 void MainWindow::on_baseDec_spinBox_valueChanged(int arg1)
 {
     ui->baseHex_spinBox->setValue(arg1);
+    baseAddr = quint32(arg1);
+    tableResize();
 }
 
 void MainWindow::on_baseHex_spinBox_valueChanged(int arg1)
 {
     ui->baseDec_spinBox->setValue(arg1);
+}
+
+void MainWindow::on_length_spinBox_valueChanged(int arg1)
+{
+    length = quint32(arg1);
+    tableResize();
+}
+
+void MainWindow::on_write_pushButton_clicked()
+{
+    int lastColumn = ui->tableWidget->columnCount() - 1;
+    QByteArray buf;
+    int state;
+    for (int i = 0; i < ui->tableWidget->rowCount(); ++i){
+        buf.push_back(char(StrIntValueCheck(ui->tableWidget->item(i, lastColumn)->text(), 16, 0, 255, 0, state)));
+        if (state != OK){
+            qDebug() << "Error. Writed data incorrected";
+            return;
+        }
+    }
+    RAWdataOut(buf);
+    makeUPXHeader(MEM_WRITE_TYPE, baseAddr, length, 0, buf);
+    sendMsg(buf);
+}
+
+void MainWindow::on_save_pushButton_clicked()
+{
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"), "reg_data", tr("CSV files (*.csv)"));
+
+    if (fileName == "") return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Text))
+    {
+        qWarning() << "Error opening file";
+        return;
+    }
+
+    QTextStream out(&file);
+
+    int columnCount = ui->tableWidget->columnCount();
+    int rowCount = ui->tableWidget->rowCount();
+    for (int row = 0; row < rowCount; ++row){
+        for (int column = 0; column < columnCount; ++column){
+            out << ui->tableWidget->item(row, column)->text() << ui->delimiter_lineEdit->text();
+        }
+        out << endl;
+    }
+
+    file.close();
+}
+
+void MainWindow::on_open_pushButton_clicked()
+{
+    QString fileName = QFileDialog::getOpenFileName(this, tr("Open File"), "reg_data" , tr("Text files (*.csv)"));
+
+    if (fileName == "") return;
+
+    QFile file(fileName);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text))
+    {
+        qWarning() << "Error opening file";
+        return;
+    }
+
+
+    QString buf;
+    while (!file.atEnd()) {
+        //buf = file.readLine().split();
+    }
+
+    file.close();
+}
+
+void MainWindow::on_copy_pushButton_clicked()
+{
+    int lastColum = ui->tableWidget->columnCount() - 1;
+    tableCopyColumn(lastColum - 1, lastColum);
+}
+
+void MainWindow::on_decAddres_checkBox_clicked()
+{
+    tableResize();
+    tableUpdate();
+}
+
+void MainWindow::on_hexAddres_checkBox_clicked()
+{
+    tableResize();
+    tableUpdate();
+}
+
+void MainWindow::on_tableWidget_cellChanged(int row, int column)
+{
+    int lastColumn = ui->tableWidget->columnCount() - 1;
+    if (lastColumn == column){
+        int state;
+        int res = StrIntValueCheck(ui->tableWidget->item(row, column)->text(), 16, 0, 255, 0, state);
+        if (state != OK){
+            ui->tableWidget->item(row, column)->setText(QString("%0").arg(res, 0, 16));
+        }
+    }
 }
