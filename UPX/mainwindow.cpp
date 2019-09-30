@@ -114,6 +114,7 @@ int MainWindow::StrIntValueCheck(QString &&str, const int base, const int min, c
     return buf;
 }
 
+
 void MainWindow::RAWdataOut(const QByteArray &data, const int str_length)
 {
     QString str;
@@ -168,7 +169,9 @@ void MainWindow::delay(const int time_ms)
 
 void MainWindow::processData(const QByteArray &msg)
 {
-    currentData = msg;
+    currentData.readData = msg;
+    currentData.addr = baseAddr;
+    writeDataUpdate();
     tableUpdate();
 }
 
@@ -184,6 +187,8 @@ void MainWindow::tableClear()
 
 void MainWindow::tableResize()
 {
+    writeDataUpdate();
+
     tableClear();
     QStringList HorizontalHeaderLabels;
 
@@ -241,7 +246,7 @@ void MainWindow::tableResize()
         item = new QTableWidgetItem();
         item->setFlags(item->flags() & ~Qt::ItemIsEditable);
         item->setTextAlignment(Qt::AlignCenter);
-        //item->setText("");
+        item->setText("0");
         ui->tableWidget->setItem(i, posColumn, item);
     }
     posColumn++;
@@ -254,17 +259,67 @@ void MainWindow::tableResize()
         item->setText("0");
         ui->tableWidget->setItem(i, posColumn, item);
     }
+
+    tableUpdate();
 }
 
 void MainWindow::tableUpdate()
 {
-    if (ui->tableWidget->rowCount() != currentData.length()){
-        qDebug() << "Error. Table update. rowCount(): " << ui->tableWidget->rowCount() << "\tdata.length()" << currentData.length();
-        return;
+
+
+
+    const int rowCount = ui->tableWidget->rowCount();
+    const int lastColumn = ui->tableWidget->columnCount() - 1;
+    qint32 offset = qint32(currentData.addr - baseAddr);
+    qint32 absOffset = qAbs(offset);
+
+    // buf init
+    QByteArray bufR, bufW;
+    bufR.resize(rowCount);
+    bufW.resize(rowCount);
+    for (auto it = bufR.begin(); it < bufR.end(); ++it){
+        *it = 0;
     }
-    int readColumn = ui->tableWidget->columnCount() - 2;
+    for (auto it = bufW.begin(); it < bufW.end(); ++it){
+        *it = 0;
+    }
+
+
+    if ((rowCount - absOffset) > 0){
+        int j = 0;
+        if (offset < 0){
+
+            for (int i = absOffset; (j < rowCount) && (i < currentData.readData.length()); ++i, ++j) {
+                bufR[j] =  currentData.readData.at(i);
+            }
+            j = 0;
+            for (int i = absOffset; (j < rowCount) && (i < currentData.writeData.length()); ++i, ++j) {
+                bufW[j] =  currentData.writeData.at(i);
+            }
+
+
+        } else {
+
+            j = 0;
+            for (int i = absOffset; (i < rowCount) && (j < currentData.readData.length()); ++i, ++j) {
+                bufR[i] =  currentData.readData.at(j);
+            }
+            j = 0;
+            for (int i = absOffset; (i < rowCount) && (j < currentData.writeData.length()); ++i, ++j) {
+                bufW[i] =  currentData.writeData.at(j);
+            }
+
+
+        }
+    }
+
+    currentData.addr = baseAddr;
+    currentData.readData = bufR;
+    currentData.writeData = bufW;
+
     for (int i = 0; i < ui->tableWidget->rowCount(); ++i) {
-        ui->tableWidget->item(i, readColumn)->setText(QString("%0").arg(quint8(currentData.at(i)), 2, 16));
+        ui->tableWidget->item(i, lastColumn)->setText(QString("%0").arg(quint8(bufW.at(i)), 2, 16));
+        ui->tableWidget->item(i, lastColumn - 1)->setText(QString("%0").arg(quint8(bufR.at(i)), 2, 16));
     }
 }
 
@@ -276,6 +331,15 @@ void MainWindow::tableCopyColumn(const int from, const int to)
     }
     for (int i = 0; i < ui->tableWidget->rowCount(); ++i) {
         ui->tableWidget->item(i, to)->setText(ui->tableWidget->item(i, from)->text());
+    }
+}
+
+void MainWindow::writeDataUpdate()
+{
+    currentData.writeData.clear();
+    int state;
+    for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
+        currentData.writeData.push_back(char(StrIntValueCheck(ui->tableWidget->item(row, ui->tableWidget->columnCount() - 1)->text(), 16, 0, 255, 0, state)));
     }
 }
 
@@ -321,7 +385,8 @@ void MainWindow::on_write_pushButton_clicked()
 
 void MainWindow::on_save_pushButton_clicked()
 {
-    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"), "reg_data", tr("CSV files (*.csv)"));
+    QString fileName = QFileDialog::getSaveFileName(this, tr("Save File"), "reg_data"
+                                                    + QString("_0x%0__L%1").arg(baseAddr, 0, 16).arg(length), tr("CSV files (*.csv)"));
 
     if (fileName == "") return;
 
@@ -334,13 +399,9 @@ void MainWindow::on_save_pushButton_clicked()
 
     QTextStream out(&file);
 
-    int columnCount = ui->tableWidget->columnCount();
-    int rowCount = ui->tableWidget->rowCount();
-    for (int row = 0; row < rowCount; ++row){
-        for (int column = 0; column < columnCount; ++column){
-            out << ui->tableWidget->item(row, column)->text() << ui->delimiter_lineEdit->text();
-        }
-        out << endl;
+    int lastColumn = ui->tableWidget->columnCount() - 1;
+    for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
+        out << ui->tableWidget->item(row, lastColumn)->text() << endl;
     }
 
     file.close();
@@ -360,12 +421,22 @@ void MainWindow::on_open_pushButton_clicked()
     }
 
 
-    QString buf;
+    QByteArray buf;
+    int state;
     while (!file.atEnd()) {
-        //buf = file.readLine().split();
+        buf.push_back(char(StrIntValueCheck(file.readLine(), 16, 0, 255, 0, state) & 0xff));
     }
-
     file.close();
+
+    int rowCount = ui->tableWidget->rowCount();
+    if (buf.length() != rowCount){
+        QMessageBox msgBox;
+        msgBox.setText(tr("File contains invalid data"));
+        msgBox.exec();
+        return;
+    }
+    currentData.writeData = buf;
+    tableUpdate();
 }
 
 void MainWindow::on_copy_pushButton_clicked()
@@ -377,13 +448,11 @@ void MainWindow::on_copy_pushButton_clicked()
 void MainWindow::on_decAddres_checkBox_clicked()
 {
     tableResize();
-    tableUpdate();
 }
 
 void MainWindow::on_hexAddres_checkBox_clicked()
 {
     tableResize();
-    tableUpdate();
 }
 
 void MainWindow::on_tableWidget_cellChanged(int row, int column)

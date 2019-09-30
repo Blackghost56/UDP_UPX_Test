@@ -7,6 +7,7 @@
 #include <QDebug>
 #include <QTime>
 #include <QFileDialog>
+#include <QMessageBox>
 
 namespace Ui {
 class MainWindow;
@@ -58,7 +59,12 @@ private:
     quint16 dst_port;
     quint32 baseAddr;
     quint32 length;
-    QByteArray currentData;
+
+    struct currentData {
+        QByteArray readData;
+        QByteArray writeData;
+        quint32 addr = 0;
+    } currentData;
 
     enum CHECK_STATE {OK = 0, MISTAKE, LESS, GREATER};
 
@@ -96,6 +102,8 @@ private:
     void tableUpdate();
     // Копирование одного стобца в другой
     void tableCopyColumn(const int from, const int to);
+    // Обновление модели данных предназначеных для записи
+    void writeDataUpdate();
 
 
 };
