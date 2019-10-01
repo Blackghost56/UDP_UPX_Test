@@ -13,6 +13,9 @@
   <property name="windowTitle">
    <string>UPX Tester</string>
   </property>
+  <property name="autoFillBackground">
+   <bool>false</bool>
+  </property>
   <widget class="QWidget" name="centralWidget">
    <layout class="QGridLayout" name="gridLayout_7">
     <item row="0" column="0">
@@ -28,12 +31,15 @@
       </property>
       <layout class="QGridLayout" name="gridLayout_6">
        <item row="0" column="0">
-        <widget class="QGroupBox" name="groupBox">
+        <widget class="QGroupBox" name="network_groupBox">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
            <horstretch>0</horstretch>
            <verstretch>0</verstretch>
           </sizepolicy>
+         </property>
+         <property name="autoFillBackground">
+          <bool>false</bool>
          </property>
          <property name="title">
           <string>Network</string>
@@ -115,7 +121,7 @@
         </widget>
        </item>
        <item row="1" column="0">
-        <widget class="QGroupBox" name="groupBox_2">
+        <widget class="QGroupBox" name="data_groupBox">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
            <horstretch>0</horstretch>
@@ -195,39 +201,33 @@
             </item>
            </layout>
           </item>
-          <item row="1" column="0">
-           <spacer name="horizontalSpacer_3">
-            <property name="orientation">
-             <enum>Qt::Horizontal</enum>
-            </property>
-            <property name="sizeHint" stdset="0">
-             <size>
-              <width>40</width>
-              <height>20</height>
-             </size>
-            </property>
-           </spacer>
-          </item>
           <item row="1" column="1">
-           <layout class="QVBoxLayout" name="verticalLayout">
-            <item>
+           <layout class="QGridLayout" name="gridLayout_8">
+            <item row="2" column="0">
+             <widget class="QPushButton" name="write_pushButton">
+              <property name="text">
+               <string>Write</string>
+              </property>
+             </widget>
+            </item>
+            <item row="0" column="0">
              <widget class="QPushButton" name="read_pushButton">
               <property name="text">
                <string>Read</string>
               </property>
              </widget>
             </item>
-            <item>
+            <item row="1" column="0">
              <widget class="QPushButton" name="copy_pushButton">
               <property name="text">
                <string>Copy</string>
               </property>
              </widget>
             </item>
-            <item>
-             <widget class="QPushButton" name="write_pushButton">
+            <item row="0" column="1">
+             <widget class="QCheckBox" name="continuous_checkBox">
               <property name="text">
-               <string>Write</string>
+               <string>Continuous</string>
               </property>
              </widget>
             </item>
@@ -237,7 +237,7 @@
         </widget>
        </item>
        <item row="2" column="0">
-        <widget class="QGroupBox" name="groupBox_3">
+        <widget class="QGroupBox" name="view_groupBox">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Preferred" vsizetype="Maximum">
            <horstretch>0</horstretch>
@@ -269,7 +269,7 @@
         </widget>
        </item>
        <item row="3" column="0">
-        <widget class="QGroupBox" name="groupBox_4">
+        <widget class="QGroupBox" name="storage_groupBox">
          <property name="title">
           <string>Storage</string>
          </property>
@@ -299,7 +299,7 @@
             </property>
             <property name="sizeHint" stdset="0">
              <size>
-              <width>68</width>
+              <width>82</width>
               <height>20</height>
              </size>
             </property>

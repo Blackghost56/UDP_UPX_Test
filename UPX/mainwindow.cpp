@@ -7,6 +7,10 @@ MainWindow::MainWindow(QWidget *parent) :
 {
     ui->setupUi(this);
 
+    QString title = TITLE;
+    title.push_back(VERSION);
+    setWindowTitle(title);
+
     ip.setAddress(ui->ip_lineEdit->text());
     dst_port = quint16(ui->dst_port_spinBox->value());
     src_port = quint16(ui->src_port_spinBox->value());
@@ -19,6 +23,11 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(socket, QOverload<QAbstractSocket::SocketError>::of(&QAbstractSocket::error),
             [=](QAbstractSocket::SocketError socketError){ qDebug() << socketError; qDebug() << "Error string:" << socket->errorString();});
     socket->bind(QHostAddress::Any, src_port);
+
+    continuousTimer.setSingleShot(false);
+    connect(&continuousTimer, &QTimer::timeout, this, &MainWindow::continuousTimerTimeout);
+    if (ui->continuous_checkBox->isChecked())
+        continuousTimer.start(TIMER_PERIOD);
 }
 
 MainWindow::~MainWindow()
@@ -53,9 +62,7 @@ void MainWindow::on_set_pushButton_clicked()
 
 void MainWindow::on_read_pushButton_clicked()
 {
-    QByteArray buf;
-    makeUPXHeader(MEM_READ_TYPE, baseAddr, length, 0, buf);
-    sendMsg(buf);
+    requestData();
 }
 
 QString MainWindow::checkIP(const QString &str)
@@ -167,9 +174,20 @@ void MainWindow::delay(const int time_ms)
     }
 }
 
+void MainWindow::requestData()
+{
+    QByteArray buf;
+    makeUPXHeader(MEM_READ_TYPE, baseAddr, length, 0, buf);
+    sendMsg(buf);
+}
+
 void MainWindow::processData(const QByteArray &msg)
 {
-    currentData.readData = msg;
+    if (msg.length() != int(length)){
+        qDebug() << "Receive data length incorrected. Receive length: " << msg.length() << "\tLength: " << length;
+        return;
+    }
+    readDataUpdate(msg);
     currentData.addr = baseAddr;
     writeDataUpdate();
     tableUpdate();
@@ -265,9 +283,6 @@ void MainWindow::tableResize()
 
 void MainWindow::tableUpdate()
 {
-
-
-
     const int rowCount = ui->tableWidget->rowCount();
     const int lastColumn = ui->tableWidget->columnCount() - 1;
     qint32 offset = qint32(currentData.addr - baseAddr);
@@ -288,7 +303,6 @@ void MainWindow::tableUpdate()
     if ((rowCount - absOffset) > 0){
         int j = 0;
         if (offset < 0){
-
             for (int i = absOffset; (j < rowCount) && (i < currentData.readData.length()); ++i, ++j) {
                 bufR[j] =  currentData.readData.at(i);
             }
@@ -296,10 +310,7 @@ void MainWindow::tableUpdate()
             for (int i = absOffset; (j < rowCount) && (i < currentData.writeData.length()); ++i, ++j) {
                 bufW[j] =  currentData.writeData.at(i);
             }
-
-
         } else {
-
             j = 0;
             for (int i = absOffset; (i < rowCount) && (j < currentData.readData.length()); ++i, ++j) {
                 bufR[i] =  currentData.readData.at(j);
@@ -308,8 +319,6 @@ void MainWindow::tableUpdate()
             for (int i = absOffset; (i < rowCount) && (j < currentData.writeData.length()); ++i, ++j) {
                 bufW[i] =  currentData.writeData.at(j);
             }
-
-
         }
     }
 
@@ -317,10 +326,14 @@ void MainWindow::tableUpdate()
     currentData.readData = bufR;
     currentData.writeData = bufW;
 
-    for (int i = 0; i < ui->tableWidget->rowCount(); ++i) {
+    for (int i = 0; i < rowCount; ++i) {
         ui->tableWidget->item(i, lastColumn)->setText(QString("%0").arg(quint8(bufW.at(i)), 2, 16));
         ui->tableWidget->item(i, lastColumn - 1)->setText(QString("%0").arg(quint8(bufR.at(i)), 2, 16));
     }
+    if (currentData.readDataChangedCells.length() == rowCount)
+        for (int i = 0; i < rowCount; ++i) {
+            ui->tableWidget->item(i, lastColumn - 1)->setBackground(currentData.readDataChangedCells.at(i) ? colorChange : colorWhite);
+        }
 }
 
 void MainWindow::tableCopyColumn(const int from, const int to)
@@ -334,6 +347,41 @@ void MainWindow::tableCopyColumn(const int from, const int to)
     }
 }
 
+void MainWindow::readDataUpdate(const QByteArray &data)
+{
+    const int rowCount = ui->tableWidget->rowCount();
+    qint32 offset = qint32(currentData.addr - baseAddr);
+    qint32 absOffset = qAbs(offset);
+
+    if (rowCount != data.length()){
+        qDebug() << "Table row count dose not match data length. Row count: " << rowCount << "\tData length: " << data.length();
+        return;
+    }
+
+    currentData.readDataChangedCells.resize(rowCount);
+    for (auto it = currentData.readDataChangedCells.begin();  it < currentData.readDataChangedCells.end(); ++it) {
+        *it = true;
+    }
+
+    if ((rowCount - absOffset) > 0){
+        int j = 0;
+        if (offset < 0){
+            for (int i = absOffset; (j < rowCount) && (i < currentData.readData.length()); ++i, ++j) {
+                if (data.at(j) == currentData.readData.at(i))
+                    currentData.readDataChangedCells[j] = false;
+            }
+        } else {
+            j = 0;
+            for (int i = absOffset; (i < rowCount) && (j < currentData.readData.length()); ++i, ++j) {
+                if (data.at(i) == currentData.readData.at(j))
+                    currentData.readDataChangedCells[i] = false;
+            }
+        }
+    }
+
+    currentData.readData = data;
+}
+
 void MainWindow::writeDataUpdate()
 {
     currentData.writeData.clear();
@@ -341,6 +389,11 @@ void MainWindow::writeDataUpdate()
     for (int row = 0; row < ui->tableWidget->rowCount(); ++row) {
         currentData.writeData.push_back(char(StrIntValueCheck(ui->tableWidget->item(row, ui->tableWidget->columnCount() - 1)->text(), 16, 0, 255, 0, state)));
     }
+}
+
+void MainWindow::continuousTimerTimeout()
+{
+    requestData();
 }
 
 void MainWindow::on_ip_lineEdit_editingFinished()
@@ -378,7 +431,7 @@ void MainWindow::on_write_pushButton_clicked()
             return;
         }
     }
-    RAWdataOut(buf);
+    //RAWdataOut(buf);
     makeUPXHeader(MEM_WRITE_TYPE, baseAddr, length, 0, buf);
     sendMsg(buf);
 }
@@ -464,5 +517,15 @@ void MainWindow::on_tableWidget_cellChanged(int row, int column)
         if (state != OK){
             ui->tableWidget->item(row, column)->setText(QString("%0").arg(res, 0, 16));
         }
+    }
+}
+
+
+void MainWindow::on_continuous_checkBox_clicked()
+{
+    if (ui->continuous_checkBox->isChecked()){
+        continuousTimer.start(TIMER_PERIOD);
+    } else {
+        continuousTimer.stop();
     }
 }

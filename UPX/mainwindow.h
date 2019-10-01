@@ -8,6 +8,10 @@
 #include <QTime>
 #include <QFileDialog>
 #include <QMessageBox>
+#include <QTimer>
+
+#define TITLE "UPX Tester ver."
+#define VERSION "1.1.1"
 
 namespace Ui {
 class MainWindow;
@@ -51,6 +55,11 @@ private slots:
 
     void on_tableWidget_cellChanged(int row, int column);
 
+    // Обработчик таймера непрерывного чтения
+    void continuousTimerTimeout();
+
+    void on_continuous_checkBox_clicked();
+
 private:
     Ui::MainWindow *ui;
     QUdpSocket *socket;
@@ -59,9 +68,11 @@ private:
     quint16 dst_port;
     quint32 baseAddr;
     quint32 length;
+    QTimer continuousTimer;
 
     struct currentData {
         QByteArray readData;
+        QVector<bool> readDataChangedCells;
         QByteArray writeData;
         quint32 addr = 0;
     } currentData;
@@ -72,11 +83,18 @@ private:
     static constexpr quint8 MEM_READ_TYPE = 0x0;
     static constexpr quint8 MEM_WRITE_TYPE = 0x1;
 
+    // Интервал автообновлления ms
+    static constexpr quint32 TIMER_PERIOD = 1000;
+
     // Названия колонок
     const QString STR_DEC_ADRR = tr("Dec addr");
     const QString STR_HEX_ADRR = tr("Hex addr");
     const QString STR_READ_DATA = tr("Read data (Hex)");
     const QString STR_WRITE_DATA = tr("Write data (Hex)");
+
+    // Цвета ячеек
+    const QColor colorChange   = QColor(255, 0, 0, 50);
+    const QColor colorWhite = QColor(255, 255, 255);
 
     // Проверка IP адреса
     QString checkIP(const QString &str);
@@ -90,6 +108,8 @@ private:
     void makeUPXHeader(const quint8 cmd, const quint32 startAddr, const quint32 size, const quint32 id, QByteArray &msg);
     void delay(const int time_ms);
 
+    // Запрос данных
+    void requestData();
     // Обработка данных
     void processData(const QByteArray &msg);
     // Инициализация таблицы
@@ -102,6 +122,8 @@ private:
     void tableUpdate();
     // Копирование одного стобца в другой
     void tableCopyColumn(const int from, const int to);
+    // Обновление модели данных прочитанных из устройства
+    void readDataUpdate(const QByteArray &data);
     // Обновление модели данных предназначеных для записи
     void writeDataUpdate();
 
