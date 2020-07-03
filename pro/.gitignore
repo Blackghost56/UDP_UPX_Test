@@ -1,7 +1,5 @@
 # Folder
-build*/
 bin/
-deploy/
 
 # Files
 *.user

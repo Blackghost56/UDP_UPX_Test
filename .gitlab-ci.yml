@@ -1,0 +1,98 @@
+# последовательность для CI
+stages:
+    - build
+variables:
+  GIT_STRATEGY: clone
+  GIT_SUBMODULE_STRATEGY: recursive
+
+
+#======================================================Сборка проекта ==============================================================
+.job_template: &build
+  script:
+    - mkdir build
+    - cd build
+    - export MAKEFLAGS=-j`nproc`
+    - cmake -DCMAKE_BUILD_TYPE=Release -DQT5_TARGET=$QT5_TARGET ../
+    - cmake --build . --target package
+    - ls -l
+
+#WHEEZY
+build_wheezy:
+    image: $CI_REGISTRY/docker-images/debian7/build:master
+    stage: build
+    script:
+    <<: *build
+    artifacts:
+        name: "upx_test_wheezy"
+        paths:
+            - build/*.deb
+    only:
+        - master
+        - develop
+    variables:
+        QT5_TARGET: "No"
+
+#JESSIE
+build_jessie:
+    image: $CI_REGISTRY/docker-images/debian8/build:master
+    stage: build
+    script:
+    <<: *build
+    artifacts:
+        name: "upx_test_jessie"
+        paths:
+            - build/*.deb
+    only:
+        - master
+        - develop
+    variables:
+        QT5_TARGET: "No"
+
+#BUSTER
+build_buster:
+    image: $CI_REGISTRY/docker-images/debian10/build:master
+    stage: build
+    script:
+    <<: *build
+    artifacts:
+        name: "upx_test_buster"
+        paths:
+           - build/*.deb
+    only:
+        - master
+        - develop
+    variables:
+        QT5_TARGET: "Yes"
+
+#CentOS7
+build_centos7:
+    image: $CI_REGISTRY/docker-images/centos7/build:master
+    stage: build
+    script:
+    <<: *build
+    artifacts:
+        name: "upx_test_centos7"
+        paths:
+           - build/*.rpm
+    only:
+        - master
+        - develop
+    variables:
+        QT5_TARGET: "Yes"
+
+#CentOS8
+build_centos8:
+    image: $CI_REGISTRY/docker-images/centos8/build:master
+    stage: build
+    script:
+    <<: *build
+    artifacts:
+        name: "upx_test_centos8"
+        paths:
+           - build/*.rpm
+    only:
+        - master
+        - develop
+    variables:
+        QT5_TARGET: "Yes"
+

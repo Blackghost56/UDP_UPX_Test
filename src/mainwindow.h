@@ -9,9 +9,9 @@
 #include <QFileDialog>
 #include <QMessageBox>
 #include <QTimer>
+#include "version.h"
 
-#define TITLE "UPX Tester ver."
-#define VERSION "1.1.1"
+#define TITLE "UPX Test ver."
 
 namespace Ui {
 class MainWindow;
@@ -59,6 +59,8 @@ private slots:
     void continuousTimerTimeout();
 
     void on_continuous_checkBox_clicked();
+
+    void on_preset_comboBox_currentIndexChanged(int index);
 
 private:
     Ui::MainWindow *ui;

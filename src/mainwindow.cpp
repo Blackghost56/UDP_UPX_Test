@@ -28,6 +28,10 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(&continuousTimer, &QTimer::timeout, this, &MainWindow::continuousTimerTimeout);
     if (ui->continuous_checkBox->isChecked())
         continuousTimer.start(TIMER_PERIOD);
+
+    ui->preset_comboBox->addItem(tr("Select"), QVariant("0"));
+    ui->preset_comboBox->addItem(tr("Mlat"), QVariant("1"));
+    ui->preset_comboBox->addItem(tr("Parrot"), QVariant("2"));
 }
 
 MainWindow::~MainWindow()
@@ -520,7 +524,6 @@ void MainWindow::on_tableWidget_cellChanged(int row, int column)
     }
 }
 
-
 void MainWindow::on_continuous_checkBox_clicked()
 {
     if (ui->continuous_checkBox->isChecked()){
@@ -528,4 +531,23 @@ void MainWindow::on_continuous_checkBox_clicked()
     } else {
         continuousTimer.stop();
     }
+}
+
+void MainWindow::on_preset_comboBox_currentIndexChanged(int index)
+{
+    switch (index) {
+    case 0:
+        return;
+    case 1:
+        ui->ip_lineEdit->setText("10.10.8.1");
+        ui->dst_port_spinBox->setValue(5053);
+        break;
+    case 2:
+        ui->ip_lineEdit->setText("192.168.191.73");
+        ui->dst_port_spinBox->setValue(5051);
+        break;
+    default:
+        break;
+    }
+    //ui->preset_comboBox->setCurrentIndex(0);
 }
